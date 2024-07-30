@@ -1,0 +1,216 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Project Agapanthus: CFN Template to create a subnet within a VPC
+
+Metadata:
+  TemplateName: subnet-stack.yaml
+  TemplateType: Subnet
+  Version: 1.0.0
+  Owner: Subhamay Bhattacharyya
+  ProjectName: Agapanthus
+  Last Modified: Jun 17, 2024
+  Resources: 
+    - Subnet
+  StepsToTest: |
+    Manualy verify the Stack.
+  StepsToCleanup: |
+    Stack delete command
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    #################################### Project Name and Environment ##############################
+    - Label:
+        default: "Project Name And Environment:"
+      Parameters:
+      - ProjectName
+      - Environment
+    #################################### GitHub Attributes #########################################
+    - Label:
+        default: "GitHub Attributes:"
+      Parameters:
+      - GitHubRef
+      - GitHubURL
+      - GitHubWFRunNumber
+      - GitHubSHA
+      - GitHubRepository
+      - CiBuild
+    #################################### VPC #######################################################
+    - Label: 
+        default: "VPC"
+      Parameters: 
+      - VPCId
+      - CidrBlock
+      - IPv6CidrBlock
+      - SubnetName
+      - AvailabilityZone
+      - EnableIPV6Cidr
+    ParameterLabels:
+      ################################## Project Name and Environment ##############################
+      ProjectName:
+        default: "Project name."
+      Environment:
+        default: "Environment name."
+      ################################## GitHub Attributes #########################################
+      GitHubRef:
+        default: "GitHub ref."
+      GitHubURL:
+        default: "GitHub URL."
+      GitHubWFRunNumber:
+        default: "GitHub workflow run number."
+      GitHubSHA:
+        default: "GitHub SHA."
+      GitHubRepository:
+        default: "GitHub repository."
+      CiBuild:
+        default: "Ci build."
+      ################################## GitHub Attributes #########################################
+      VPCId:
+        default: "VPC Id in which the subnet will be created"
+      CidrBlock:
+        default: "Subnet IPV4 CI/DR Block."
+      IPv6CidrBlock:
+        default: "Subnet IPV4 CI/DR Block."
+      SubnetName: 
+        default: "Subnet name."
+      AvailabilityZone:
+        default: "Avalibility Zone."
+      EnableIPV6Cidr:
+        default: "Enable IPV6 CI/DR ?."
+Parameters:
+  ###################################### Project Name and Environment ##############################
+  ProjectName:
+    Default: agapanthus
+    Description: "The project name that will be used as resource name prefixes and will be used to tag resources to track the project cost."
+    Type: String
+    MinLength: 5
+    MaxLength: 20
+    AllowedPattern: "[a-z]*"
+    ConstraintDescription: "The length should be between 5 and 30, must contain only lowercase alphabets."
+  Environment:
+    Default: devl
+    Description: "The deployment environment (dev/test/prod)."
+    Type: String
+    AllowedValues: ["devl", "test", "prod"]
+  ###################################### GitHub Attributes #########################################
+  GitHubRef:
+    Default: ref_name
+    Description: "GitHub ref name"
+    Type: String
+  GitHubURL:
+    Default: "https://github.com/"
+    Description: "GitHub URL"
+    Type: String
+  GitHubWFRunNumber:
+    Default: 1
+    Description: "The GitHub workflow run number for the latest CI/CD pipeline."
+    Type: Number
+  GitHubSHA:
+    Default: "27e994ee4b064c37170c9a702c44b676c3295e1f"
+    Description: "The sha value of the last commit."
+    Type: String
+  GitHubRepository:
+    Default: 0052-agapanthus-cft
+    Description: "The GitHub repository name."
+    Type: String
+    MinLength: 10
+    MaxLength: 30
+    AllowedPattern: "[a-z0-9-.]*"
+    ConstraintDescription: "The reposiroty length should be between 10 and 30, must contain only lowercase letter,numbers,dash, dot and should start with a letter."
+  CiBuild:
+    Default: ""
+    Description: "Ci Build of the feature branch."
+    Type: String
+  ###################################### VPC #######################################################
+  VPCId:
+    Default: vpc-11111x22222222222
+    Description: "VPC Base Name."
+    Type: String
+    MinLength: 21
+    MaxLength: 21
+    AllowedPattern: "[a-z0-9-]*"
+  CidrBlock: 
+    Description: "Subnet IPV4 CI/DR block"
+    Type: String
+  IPv6CidrBlock:
+    Description: "Subnet IPV6 CI/DR block"
+    Type: String
+  SubnetName: 
+    Description: "Subnet name."
+    Type: String
+  AvailabilityZone: 
+    Description: "Subnet avaliability zone"
+    Type: String
+  EnableIPV6Cidr:
+    Default: "false"
+    Description: "IPV6 Cidr enabled ?"
+    Type: String
+    AllowedValues:
+    - "true"
+    - "false"
+  NetworkAclId: 
+    Default: acl-0b66e8ad839de36b5
+    Type: String
+    Description: Network Acl Id
+    MinLength: 21
+    MaxLength: 21
+    AllowedPattern: "[a-z0-9-]*"
+######################################## Conditional ###############################################
+Conditions:
+  EnableIPV6Cidr: !Equals [!Ref EnableIPV6Cidr, "true"]
+
+Resources:
+  ###################################### Subnet ####################################################
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCId
+      CidrBlock: !Ref CidrBlock
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Ref AvailabilityZone
+      Tags:
+        - Key: Name
+          Value: !Ref SubnetName
+        - Key: ProjectName
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: GitHubRepository
+          Value: !Ref GitHubRepository
+        - Key: GitHubRef
+          Value: !Ref GitHubRef
+        - Key: GitHubURL
+          Value: !Ref GitHubURL
+        - Key: GitHubWFRunNumber
+          Value: !Ref GitHubWFRunNumber
+        - Key: GitHubSHA
+          Value: !Ref GitHubSHA
+        - Key: CiBuild
+          Value: !Ref CiBuild
+  SubnetIPV6CidrBlock:
+    Type: AWS::EC2::SubnetCidrBlock
+    Condition: EnableIPV6Cidr
+    Properties:
+      Ipv6CidrBlock: !Ref IPv6CidrBlock
+      SubnetId: !Ref Subnet
+  SubnetNetworkAclAssociation:
+     Type: AWS::EC2::SubnetNetworkAclAssociation
+     Properties:
+       SubnetId:
+         Ref: Subnet
+       NetworkAclId: !Ref NetworkAclId
+Outputs:
+  SubnetId:
+    Description: Subnet Id
+    Value: !Ref Subnet
+  SubnetAvailabilityZone:
+    Description: Subnet Availability Zone
+    Value: !GetAtt Subnet.AvailabilityZone
+  SubnetAvailabilityZoneId:
+    Description: Subnet Availability Zone Id
+    Value: !GetAtt Subnet.AvailabilityZoneId
+  SubnetCidrBlock:
+    Description: Subnet CI/DR Block
+    Value: !GetAtt Subnet.CidrBlock
+  SubnetNetworkAclAssociationId:
+    Description: Subnet Network Acl Association Id
+    Value: !GetAtt SubnetNetworkAclAssociation.AssociationId

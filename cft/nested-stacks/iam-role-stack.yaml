@@ -1,0 +1,349 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Project Agapanthus: CFN Template To Create an IAM Role For Glue Catalog. 
+
+Metadata:
+  TemplateName: glue-iam-role-stack.yaml
+  TemplateType: Glue Database
+  Version: 1.0.0
+  Owner: Subhamay Bhattacharyya
+  ProjectName: Agapanthus
+  Modification History: 
+    - 1.0.0  - Jun 30, 2024   -- Initial Version.
+    
+  Resources: 
+    - IAM Role for Glue Catalog
+  StepsToTest: |
+    Manualy verify the Stack.
+  StepsToCleanup: |
+    Stack delete command
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    #################################### Project Name and Environment ##############################
+    - Label: 
+        default: "Project And Environment:"
+      Parameters: 
+      - ProjectName
+      - Environment
+    #################################### GitHub Attributes #########################################
+    - Label:
+        default: "GitHub Attributes:"
+      Parameters:
+      - GitHubRef
+      - GitHubURL
+      - GitHubWFRunNumber
+      - GitHubSHA
+      - GitHubRepository
+      - CiBuild
+    #################################### KMS Key ###################################################
+    - Label:
+        default: "KMS Key:"
+      Parameters:
+      - KmsMasterKeyArn
+    #################################### Glue IAM Role #############################################
+    - Label:
+        default: "Glue IAM Configuration:"
+      Parameters:
+      - GlueIAMRoleBaseName
+      - GlueIAMPolicyBaseName
+    #################################### S3 Bucket #################################################
+    - Label:
+        default: "S3 Bucket:"
+      Parameters:
+      - S3LandingZoneBucketBaseName
+    #################################### Athena WorkGroup ##########################################
+    - Label:
+        default: "Athena Configuration:"
+      Parameters:
+      - AthenaWorkGroupBaseName
+    ParameterLabels:
+      ################################## Project Name and Environment ##############################
+      ProjectName:
+        default: "Project name."
+      Environment:
+        default: "Environment name."
+      ################################## GitHub Attributes #########################################
+      GitHubRef:
+        default: "GitHub ref."
+      GitHubURL:
+        default: "GitHub URL."
+      GitHubWFRunNumber:
+        default: "GitHub workflow run number."
+      GitHubSHA:
+        default: "GitHub SHA."
+      GitHubRepository:
+        default: "GitHub repository."
+      CiBuild:
+        default: "Ci build."
+      ################################## KMS Key ###################################################
+      KmsMasterKeyArn:
+        default: "KMS Key:"
+      ################################## Glue IAM Role #############################################
+      GlueIAMRoleBaseName:
+        default: "Glue IAM Role Name."
+      GlueIAMPolicyBaseName:
+        default: "Glue IAM Policy Name."
+      ################################## S3 Bucket #################################################
+      S3LandingZoneBucketBaseName:
+        default: "S3 Bucket:"
+      ################################## Athena WorkGroup ##########################################
+      AthenaWorkGroupBaseName: 
+        default: "Athena WorkGroup."
+Parameters:
+  ###################################### Project Name and Environment ##############################
+  ProjectName:
+    Default: agapanthus
+    Description: "The project name that will be used as resource name prefixes and will be used to tag resources to track the project cost."
+    Type: String
+    MinLength: 5
+    MaxLength: 20
+    AllowedPattern: "[a-z]*"
+    ConstraintDescription: "The length should be between 5 and 30, must contain only lowercase alphabets."
+  Environment:
+    Default: devl
+    Description: "The deployment environment (dev/test/prod)."
+    Type: String
+    AllowedValues: ["devl", "test", "prod"]
+  ###################################### GitHub Attributes #########################################
+  GitHubRef:
+    Default: ref_name
+    Description: "GitHub ref name"
+    Type: String
+  GitHubURL:
+    Default: "https://github.com/"
+    Description: "GitHub URL"
+    Type: String
+  GitHubWFRunNumber:
+    Default: 1
+    Description: "The GitHub workflow run number for the latest CI/CD pipeline."
+    Type: Number
+  GitHubSHA:
+    Default: "27e994ee4b064c37170c9a702c44b676c3295e1f"
+    Description: "The sha value of the last commit."
+    Type: String
+  GitHubRepository:
+    Default: 0052-agapanthus-cft
+    Description: "The GitHub repository name."
+    Type: String
+    MinLength: 10
+    MaxLength: 30
+    AllowedPattern: "[a-z0-9-.]*"
+    ConstraintDescription: "The reposiroty length should be between 10 and 30, must contain only lowercase letter,numbers,dash, dot and should start with a letter."
+  CiBuild:
+    Default: ""
+    Description: "Ci Build of the feature branch."
+    Type: String
+  ###################################### KMS Key ###################################################
+  KmsMasterKeyArn:
+    Default: "arn:aws:kms:us-east-1:637423502513:key/494509e4-3bc5-44b8-9c4d-12449900d395"
+    Description: "The KMS key arn used to encrypt the resources."
+    Type: String
+    MinLength: "75"
+    MaxLength: "75"
+    AllowedPattern: "[a-z:/0-9-]*"
+    ConstraintDescription: "The length of the KMS Key Id should be 36 and must be lowercase alphabets, numbers and dash."
+  ###################################### Glue IAM Role #############################################
+  GlueIAMRoleBaseName:
+    Default: glue-iam-role
+    Description: "The IAM Role base name to be used by glue."
+    Type: String
+    MinLength: 10
+    MaxLength: 40
+    AllowedPattern: "[a-z][a-z0-9-.]*"
+    ConstraintDescription: "The length should be between 10 and 40, must contain only lowercase letter,numbers,dash, dot and should start with a letter."
+  GlueIAMPolicyBaseName:
+    Default: glue-iam-policy
+    Description: "The IAM Policy name to be used by glue."
+    Type: String
+    MinLength: 10
+    MaxLength: 40
+    AllowedPattern: "[a-z][a-z0-9-.]*"
+    ConstraintDescription: "The length should be between 10 and 40, must contain only lowercase letter,numbers,dash, dot and should start with a letter." 
+  ###################################### S3 Bucket #################################################
+  S3LandingZoneBucketBaseName:
+    Default: some-s3-bucket-name
+    Description: "The S3 Bucket Base Name For The Source Data, The Region Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: "3"
+    MaxLength: "40"
+    AllowedPattern: "[a-z][a-z0-9-.]*"
+    ConstraintDescription: "The length should be between 3 and 40, must contain only lowercase letter,numbers,dash, dot and should start with a letter."
+  ###################################### Athena WorkGroup ##########################################
+  AthenaWorkGroupBaseName:
+    Default: workgroup
+    Description: "The Athena WorkGroup base name for the source data, the region will be added as suffix by the template."
+    Type: String
+    MinLength: "3"
+    MaxLength: "40"
+    AllowedPattern: "[a-z][a-z0-9-.]*"
+    ConstraintDescription: "The length should be between 3 and 40, must contain only lowercase letter,numbers,dash, dot and should start with a letter."
+Resources:
+  ###################################### Glue IAM Role #############################################
+  GlueIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${GlueIAMRoleBaseName}${CiBuild}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "glue.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSGlueServiceRole"
+      Policies:
+        -
+          PolicyName: !Sub "${ProjectName}-${GlueIAMPolicyBaseName}${CiBuild}"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action: 
+                - s3:GetObject
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${ProjectName}-${S3LandingZoneBucketBaseName}-${Environment}-${AWS::Region}${CiBuild}/*"
+              -
+                Effect: "Allow"
+                Action: 
+                - kms:Encrypt
+                - kms:Decrypt
+                - kms:GenerateDataKey*
+                Resource: !Ref KmsMasterKeyArn
+      Tags:
+        - Key: ProjectName
+          Value: !Ref ProjectName
+        - Key:  Environment
+          Value: !Ref Environment
+        - Key: GitHubRepository
+          Value: !Ref GitHubRepository
+        - Key: GitHubRef
+          Value: !Ref GitHubRef
+        - Key: GitHubURL
+          Value: !Ref GitHubURL
+        - Key: GitHubWFRunNumber
+          Value: !Ref GitHubWFRunNumber
+        - Key: GitHubSHA
+          Value: !Ref GitHubSHA
+        - Key: CiBuild
+          Value: !Ref CiBuild
+  AthenaIAMUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: "athena"
+      LoginProfile: 
+        Password: "{{resolve:secretsmanager:allium/devl/athena-password:SecretString:allium-iamuser::aa3e1e64-c31d-43a6-a511-136b406cf2b7}}"
+      Path: /
+      Tags:
+      - Key: ProjectName
+        Value: !Ref ProjectName
+      - Key:  Environment
+        Value: !Ref Environment
+      - Key: GitHubRepository
+        Value: !Ref GitHubRepository
+      - Key: GitHubRef
+        Value: !Ref GitHubRef
+      - Key: GitHubURL
+        Value: !Ref GitHubURL
+      - Key: GitHubWFRunNumber
+        Value: !Ref GitHubWFRunNumber
+      - Key: GitHubSHA
+        Value: !Ref GitHubSHA
+      - Key: CiBuild
+        Value: !Ref CiBuild 
+  AthenaIAMPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${ProjectName}-${AthenaWorkGroupBaseName}-policy${CiBuild}"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Sid: "WorkGroups"
+            Effect: "Allow"
+            Action: 
+            - athena:ListWorkGroups
+            - athena:GetWorkGroup
+            Resource: "*"
+          -
+            Sid: "Athena"
+            Effect: "Allow"
+            Action: 
+            - athena:StartQueryExecution
+            - athena:StopQueryExecution
+            - athena:BatchGetQueryExecution
+            - athena:GetQueryExecution
+            - athena:ListQueryExecutions
+            - athena:GetQueryResults
+            - athena:GetQueryResultsStream
+            - athena:CreateNamedQuery
+            - athena:GetNamedQuery
+            - athena:BatchGetNamedQuery
+            - athena:ListNamedQueries
+            - athena:DeleteNamedQuery
+            - athena:CreatePreparedStatement
+            - athena:GetPreparedStatement
+            - athena:ListPreparedStatements
+            - athena:UpdatePreparedStatement
+            - athena:DeletePreparedStatement
+            Resource: !Sub "arn:${AWS::Partition}:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${ProjectName}-${AthenaWorkGroupBaseName}-${Environment}-${AWS::Region}${CiBuild}"
+          -
+            Sid: "Glue"
+            Effect: "Allow"
+            Action: 
+            - glue:GetDatabases
+            - glue:GetTable*
+            Resource: "*"
+          -
+            Sid: "S3"
+            Effect: "Allow"
+            Action: 
+            - s3:AbortMultipartUpload
+            - s3:GetBucketLocation
+            - s3:GetObject
+            - s3:ListBucket
+            - s3:ListMultipartUploadParts
+            - s3:PutObject
+            Resource: 
+            - !Sub "arn:${AWS::Partition}:s3:::${ProjectName}-${S3LandingZoneBucketBaseName}-${Environment}-${AWS::Region}${CiBuild}"
+            - !Sub "arn:${AWS::Partition}:s3:::${ProjectName}-${S3LandingZoneBucketBaseName}-${Environment}-${AWS::Region}${CiBuild}/*"
+  AthenaIAMRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      RoleName: !Sub "${ProjectName}-${AthenaWorkGroupBaseName}-role${CiBuild}"
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              AWS: 
+                - !GetAtt AthenaIAMUser.Arn
+            Action: 
+              - "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+      - !Ref AthenaIAMPolicy
+Outputs:
+  GlueIAMRoleArn:
+    Description: The Arn of the glue iam role.
+    Value: !GetAtt GlueIAMRole.Arn
+  GlueIAMRoleId:
+    Description: The Canonical Id of the glue iam role.
+    Value: !GetAtt GlueIAMRole.RoleId
+  AthenaManagedPolicyArn:
+    Description: IAM Managed Policy Arn that grants access to run query against the Athena tables
+    Value: !Ref AthenaIAMPolicy
+  AthenaIAMRoleArn:
+    Description: IAM Role Arn authorised to query the Athena workgroup
+    Value: !GetAtt AthenaIAMUser.Arn
+  AthenaIAMRoleId:
+    Description: IAM Role Id authorised to query the Athena workgroup
+    Value: !GetAtt AthenaIAMRole.RoleId
+  AthenaIAMUserArn:
+    Description: IAM User Arn authorised to query the Athena workgroup
+    Value: !GetAtt AthenaIAMUser.Arn

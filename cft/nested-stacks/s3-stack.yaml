@@ -1,0 +1,292 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Project Agapanthus: CFN Template To Create A S3 Table With Or Without A Folder. 
+
+Metadata:
+  TemplateName: s3-stack.yaml
+  TemplateType: S3 bucket with optionally default folder
+  Version: 1.0.0
+  Owner: Subhamay Bhattacharyya
+  ProjectName: Agapanthus
+  Modification History: 
+    - 1.0.0  - Jul 09, 2024   -- Initial Version.
+
+  Resources: 
+    - S3 Bucket
+    - Bucket Policy
+  StepsToTest: |
+    Manualy verify the Stack.
+  StepsToCleanup: |
+    Stack delete command
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    #################################### Project Name and Environment ##############################
+    - Label: 
+        default: "Project And Environment:"
+      Parameters: 
+      - ProjectName
+      - Environment
+    #################################### GitHub Attributes #########################################
+    - Label:
+        default: "GitHub Attributes:"
+      Parameters:
+      - GitHubRef
+      - GitHubURL
+      - GitHubWFRunNumber
+      - GitHubSHA
+      - GitHubRepository
+      - CiBuild
+    #################################### KMS Key ###################################################
+    - Label: 
+        default: "KMS Configuration:"
+      Parameters: 
+      - KmsMasterKeyArn
+      - KmsMasterKeyAlias
+    #################################### S3 Bucket #################################################
+    - Label:
+        default: "S3 Configuration:"
+      Parameters:
+      - S3LandingZoneBucketBaseName
+      - S3BucketBlockPublicAcls
+      - S3BucketBlockPublicPolicy
+      - S3BucketIgnorePublicAcls
+      - S3BucketRestrictPublicBuckets
+      - S3VpcEndpointId
+      - GlueIAMRoleId
+      - AthenaIAMRoleId
+    ParameterLabels:
+      ################################## Project Name and Environment ##############################
+      ProjectName:
+        default: "Project Name."
+      Environment:
+        default: "Environment Name."
+      ################################## GitHub Attributes #########################################
+      GitHubRef:
+        default: "GitHub Ref."
+      GitHubURL:
+        default: "GitHub URL."
+      GitHubWFRunNumber:
+        default: "GitHub Workflow Run Number."
+      GitHubSHA:
+        default: "GitHub SHA"
+      GitHubRepository:
+        default: "GitHub Repository."
+      CiBuild:
+        default: "Ci Build."
+      ################################## KMS Key ###################################################
+      KmsMasterKeyAlias:
+        default: "Kms Key alias."
+      KmsMasterKeyArn:
+        default: "Kms Key arn."
+      ################################## S3 Bucket #################################################
+      S3LandingZoneBucketBaseName:
+        default: "S3 Bucket Base Name."
+      S3BucketBlockPublicAcls:
+        default: "Allow BlockPublicAcls"
+      S3BucketBlockPublicPolicy:
+        default: "Allow BlockPublicPolicy"
+      S3BucketIgnorePublicAcls:
+        default: "Allow IgnorePublicAcls"
+      S3BucketRestrictPublicBuckets:
+        default: "Allow restrictPublicBuckets"
+      S3VpcEndpointId: 
+        default: "S3 VPC Gateway endpoint id."
+      GlueIAMRoleId: 
+        default: "Glue IAM Role Id."
+      AthenaIAMRoleId:
+        default: "Athena IAM Role Id."
+Parameters:
+  ###################################### Project Name and Environment ##############################
+  ProjectName:
+    Default: agapanthus
+    Description: "The project name that will be used as resource name prefixes and will be used to tag resources to track the project cost."
+    Type: String
+    MinLength: 5
+    MaxLength: 20
+    AllowedPattern: "[a-z]*"
+    ConstraintDescription: "The length should be between 5 and 30, must contain only lowercase alphabets."
+  Environment:
+    Default: devl
+    Description: "The deployment environment (dev/test/prod)."
+    Type: String
+    AllowedValues: ["devl", "test", "prod"]
+  ###################################### GitHub Attributes #########################################
+  GitHubRef:
+    Default: ref_name
+    Description: "GitHub ref name"
+    Type: String
+  GitHubURL:
+    Default: "https://github.com/"
+    Description: "GitHub URL"
+    Type: String
+  GitHubWFRunNumber:
+    Default: 1
+    Description: "The GitHub workflow run number for the latest CI/CD pipeline."
+    Type: Number
+  GitHubSHA:
+    Default: "27e994ee4b064c37170c9a702c44b676c3295e1f"
+    Description: "The sha value of the last commit."
+    Type: String
+  GitHubRepository:
+    Default: 0052-agapanthus-cft
+    Description: "The GitHub repository name."
+    Type: String
+    MinLength: 10
+    MaxLength: 30
+    AllowedPattern: "[a-z0-9-.]*"
+    ConstraintDescription: "The reposiroty length should be between 10 and 30, must contain only lowercase letter,numbers,dash, dot and should start with a letter."
+  CiBuild:
+    Default: ""
+    Description: "Ci Build of the feature branch."
+    Type: String
+  ###################################### KMS Key ###################################################
+  KmsMasterKeyAlias:
+    Default: "SB-KMS"
+    Description: "The KMS Master Key Alias to be used for server side encryption."
+    Type: String
+    MinLength: "5"
+    MaxLength: "20"
+    AllowedPattern: "[a-zA-Z0-9-]*"
+    ConstraintDescription: "The length of the KMS Key Alias should be beteen 5 and 20 and can only contain alphanumeric characters and dash."
+  KmsMasterKeyArn:
+    Default: "arn:aws:kms:us-east-1:637423502513:key/494509e4-3bc5-44b8-9c4d-12449900d395"
+    Description: "The KMS key arn used to encrypt the resources."
+    Type: String
+    MinLength: "75"
+    MaxLength: "75"
+    AllowedPattern: "[a-z:/0-9-]*"
+    ConstraintDescription: "The length of the KMS Key Id should be 36 and must be lowercase alphabets, numbers and dash."
+  ###################################### S3 Bucket #################################################
+  S3LandingZoneBucketBaseName:
+    Default: some-s3-bucket-name
+    Description: "The S3 Bucket Base Name For The Source Data, The Region Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: "3"
+    MaxLength: "40"
+    AllowedPattern: "[a-z][a-z0-9-.]*"
+    ConstraintDescription: "The length should be between 3 and 40, must contain only lowercase letter,numbers,dash, dot and should start with a letter."
+  S3BucketBlockPublicAcls:
+    Default: "true"
+    Description: "Allow Block Public Acls"
+    Type: String
+    AllowedValues: ["true", "false"]
+  S3BucketBlockPublicPolicy:
+    Default: "true"
+    Description: "Allow Block Public Policy"
+    Type: String
+    AllowedValues: ["true", "false"]
+  S3BucketIgnorePublicAcls:
+    Default: "true"
+    Description: "Allow Ignore Public Acls"
+    Type: String
+    AllowedValues: ["true", "false"]
+  S3BucketRestrictPublicBuckets:
+    Default: "true"
+    Description: "Allow Restrict Public Buckets"
+    Type: String
+    AllowedValues: ["true", "false"]
+  S3VpcEndpointId: 
+    Description: "S3 Gateway VPC endpoint Id."
+    Type: String
+  GlueIAMRoleId:
+    Description: "Canonical Id of the Glue IAM Role"
+    Type: String
+  AthenaIAMRoleId:
+    Description: "Canonical Id of the Athena IAM Role"
+    Type: String
+Resources:
+  ###################################### S3 Bucket #################################################
+  S3LandingZoneBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-${S3LandingZoneBucketBaseName}-${Environment}-${AWS::Region}${CiBuild}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration: 
+        - BucketKeyEnabled: True
+          ServerSideEncryptionByDefault: 
+            SSEAlgorithm: 'aws:kms'
+            KMSMasterKeyID: !Sub 'alias/${KmsMasterKeyAlias}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: !Ref S3BucketBlockPublicAcls
+        BlockPublicPolicy: !Ref S3BucketBlockPublicPolicy
+        IgnorePublicAcls: !Ref S3BucketIgnorePublicAcls
+        RestrictPublicBuckets: !Ref S3BucketRestrictPublicBuckets
+      Tags:
+      - Key: ProjectName
+        Value: !Ref ProjectName
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: GitHubRepository
+        Value: !Ref GitHubRepository
+      - Key: GitHubRef
+        Value: !Ref GitHubRef
+      - Key: GitHubURL
+        Value: !Ref GitHubURL
+      - Key: GitHubWFRunNumber
+        Value: !Ref GitHubWFRunNumber
+      - Key: GitHubSHA
+        Value: !Ref GitHubSHA
+      - Key: CiBuild
+        Value: !Ref CiBuild
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3LandingZoneBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: 'Deny-unless-SSE-KMS-encrypiton'
+            Action:
+            - s3:PutObject
+            Effect: Deny
+            Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-${S3LandingZoneBucketBaseName}-${Environment}-${AWS::Region}${CiBuild}/*'
+            Principal: "*"
+            Condition: 
+              "StringNotEqualsIfExists": 
+                "s3:x-amz-server-side-encryption": "aws:kms"
+              "Null":
+                "s3:x-amz-server-side-encryption": "false"
+          - Sid: 'Deny-unless-SSE-KMS-KeyId'
+            Action:
+            - s3:PutObject
+            Effect: Deny
+            Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-${S3LandingZoneBucketBaseName}-${Environment}-${AWS::Region}${CiBuild}/*'
+            Principal: "*"
+            Condition: 
+              "StringNotEqualsIfExists": 
+                "s3:x-amz-server-side-encryption-aws-kms-key-id": !Ref KmsMasterKeyArn
+          - Sid: 'EnforceInFlightObjectEncryption'
+            Action:
+            - s3:PutObject
+            Effect: Deny
+            Resource: 
+            - !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-${S3LandingZoneBucketBaseName}-${Environment}-${AWS::Region}${CiBuild}/*'
+            Principal: "*"
+            Condition: 
+              Bool: 
+                aws:SecureTransport: "false"
+          - Sid: 'S3-Security-Deny-unless-VPC-endpoint'
+            Action:
+            - s3:GetObject
+            Effect: Deny
+            Resource: 
+            - !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-${S3LandingZoneBucketBaseName}-${Environment}-${AWS::Region}${CiBuild}/*'
+            Principal: "*"
+            Condition: 
+              StringNotEquals: 
+                aws:sourceVpce: 
+                  - !Ref S3VpcEndpointId
+              StringNotLike:
+                aws:userId: 
+                ## Role id of the Glue IAM Role
+                - !Sub "${GlueIAMRoleId}:*"
+                - !Sub "${AthenaIAMRoleId}:*"
+                ## AROAZI2LGYSYVKL4XJGIN is the RoleId of OrganizationAccountAccessRole
+                - "AROAZI2LGYSYVKL4XJGIN:*"
+                ## AIDAZI2LGYSY7WDKOVKYW is the userId of iamadmin
+                - "AIDAZI2LGYSY7WDKOVKYW"
+Outputs:
+  S3LandingZoneBucketArn:
+    Description: The endpoint of the S3 source data bucket.
+    Value: !GetAtt S3LandingZoneBucket.Arn

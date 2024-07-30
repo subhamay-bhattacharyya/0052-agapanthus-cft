@@ -1,0 +1,474 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Project Agapanthus: Root Stack Template to create VPC with custom NACL, two private subnets,
+  an Internet Gateway, Nat Gateway and VPC Endpoints for S3(Gateway) and Glue (Interface)
+
+Metadata:
+  TemplateName: network-stack.yaml
+  TemplateType: Root stack template
+  Version: 1.0.0
+  Owner: Subhamay Bhattacharyya
+  ProjectName: Agapanthus
+  Modification History:
+    - 1.0.0  - Jun 26, 2024   -- Initial Version
+  Resources: 
+    - 1. One custom VPC with 3 CI/DR Ranges
+    - 2. Custom NACL with inbound and outbound rules
+    - 3. Four private subnets
+    - 4. Internet Gateway
+    - 5. NAT Gateway
+    - 6. VPC Gateway Endpoint for S3.
+    - 7. VPC Interface Endpoint for Glue.
+  StepsToTest: |
+    Manualy verify the Stack.
+  StepsToCleanup: |
+    Stack delete command
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    #################################### Project Name and Environment ##############################
+    - Label:
+        default: "Project Name And Environment:"
+      Parameters:
+      - ProjectName
+      - Environment
+    #################################### GitHub Attributes #########################################
+    - Label:
+        default: "GitHub Attributes:"
+      Parameters:
+      - GitHubRef
+      - GitHubURL
+      - GitHubWFRunNumber
+      - GitHubSHA
+      - GitHubRepository
+      - CiBuild
+    #################################### Code Repository Bucket ####################################
+    - Label:
+        default: "Code Repository S3 Bucket:"
+      Parameters:
+      - CodeRepositoryS3Bucket
+    #################################### VPC #######################################################
+    - Label: 
+        default: "VPC:"
+      Parameters: 
+      - VPCBaseName
+      - EnableIPV6Cidr
+    #################################### S3 Bucket #################################################
+    - Label:
+        default: "S3 bucket configuration:"
+      Parameters:
+      - S3LandingZoneBucketBaseName
+    ParameterLabels:
+      ################################## Project Name and Environment ##############################
+      ProjectName:
+        default: "Project name."
+      Environment:
+        default: "Environment name."
+      ################################## GitHub Attributes #########################################
+      GitHubRef:
+        default: "GitHub ref."
+      GitHubURL:
+        default: "GitHub URL."
+      GitHubWFRunNumber:
+        default: "GitHub workflow run number."
+      GitHubSHA:
+        default: "GitHub SHA."
+      GitHubRepository:
+        default: "GitHub repository."
+      CiBuild:
+        default: "Ci build."
+      ################################## Code Repository Bucket ####################################
+      CodeRepositoryS3Bucket:
+        default: "Code Repository S3 Bucket."
+      ################################## VPC #######################################################
+      VPCBaseName:
+        default: "Base name of the VPC."
+      EnableIPV6Cidr:
+        default: "Enable IPV6"
+      ################################## S3 Bucket #################################################
+      S3LandingZoneBucketBaseName:
+        default: "S3 Bucket Base Name."
+Parameters:
+  ###################################### Project Name and Environment ##############################
+  ProjectName:
+    Default: agapanthus
+    Description: "The project name that will be used as resource name prefixes and will be used to tag resources to track the project cost."
+    Type: String
+    MinLength: 5
+    MaxLength: 20
+    AllowedPattern: "[a-z]*"
+    ConstraintDescription: "The length should be between 5 and 30, must contain only lowercase alphabets."
+  Environment:
+    Default: devl
+    Description: "The deployment environment (dev/test/prod)."
+    Type: String
+    AllowedValues: ["devl", "test", "prod"]
+  ###################################### Code Repository S3 Bucket #################################
+  CodeRepositoryS3Bucket:
+    Default: subhamay-projects-repository-637423502513-devl-us-east-1
+    Description: "S3 bucket storing the project artifacts like Lambda code, CF templates etc."
+    Type: String
+    MinLength: 10
+    MaxLength: 63
+    AllowedPattern: "[a-z][a-z0-9-.]*"
+    ConstraintDescription: "The length should be between 3 and 63, must contain only lowercase letter,numbers,dash, dot and should start with a letter."
+  ###################################### GitHub Attributes #########################################
+  GitHubRef:
+    Default: ref_name
+    Description: "GitHub ref name"
+    Type: String
+  GitHubURL:
+    Default: "https://github.com/"
+    Description: "GitHub URL"
+    Type: String
+  GitHubWFRunNumber:
+    Default: 1
+    Description: "The GitHub workflow run number for the latest CI/CD pipeline."
+    Type: Number
+  GitHubSHA:
+    Default: "27e994ee4b064c37170c9a702c44b676c3295e1f"
+    Description: "The sha value of the last commit."
+    Type: String
+  GitHubRepository:
+    Default: 0052-agapanthus-cft
+    Description: "The GitHub repository name."
+    Type: String
+    MinLength: 10
+    MaxLength: 30
+    AllowedPattern: "[a-z0-9-.]*"
+    ConstraintDescription: "The reposiroty length should be between 10 and 30, must contain only lowercase letter,numbers,dash, dot and should start with a letter."
+  CiBuild:
+    Default: ""
+    Description: "Ci Build of the feature branch."
+    Type: String
+  ###################################### VPC #######################################################
+  VPCBaseName:
+    Default: vpc
+    Description: "VPC name."
+    Type: String
+    MinLength: 3
+    MaxLength: 4
+    AllowedPattern: "[a-z0-9]*"
+  EnableIPV6Cidr:
+    Default: "false"
+    Description: "Enable IPV6 Cidr ?"
+    Type: String
+    AllowedValues:
+    - "true"
+    - "false"
+  ###################################### S3 Bucket #################################################
+  S3LandingZoneBucketBaseName:
+    Default: some-s3-bucket-name
+    Description: "The S3 Bucket Base Name For The Source Data, The Region Will Be Added As Suffix By The Template."
+    Type: String
+    MinLength: "3"
+    MaxLength: "40"
+    AllowedPattern: "[a-z][a-z0-9-.]*"
+    ConstraintDescription: "The length should be between 3 and 40, must contain only lowercase letter,numbers,dash, dot and should start with a letter."
+######################################## Mapppings #################################################
+Mappings:
+  SubnetConfig:
+    VpcCidrBlock:
+      CIDR: '10.0.0.0/16'
+    PrivateSubnetAZ1CidrBlock:
+      CIDR: '10.0.0.0/24'
+    PrivateSubnetAZ2CidrBlock:
+      CIDR: '10.0.1.0/24'
+######################################## Conditions ################################################
+Conditions:
+  EnableIPV6Cidr: !Equals [!Ref EnableIPV6Cidr, "true"]
+Resources:
+  ###################################### VPC #######################################################
+  VPC:
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${CodeRepositoryS3Bucket}.s3.amazonaws.com/${GitHubRepository}/${GitHubSHA}/cft/nested-stacks/vpc-stack.yaml'
+      Parameters:  
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        GitHubRepository: !Ref GitHubRepository
+        GitHubRef: !Ref GitHubRef
+        GitHubURL: !Ref GitHubURL
+        GitHubWFRunNumber: !Ref GitHubWFRunNumber
+        GitHubSHA: !Ref GitHubSHA
+        CiBuild: !Ref CiBuild
+        VPCName: !Sub '${ProjectName}-${VPCBaseName}-${Environment}-${AWS::Region}${CiBuild}'
+        VPCCidrBlock: !FindInMap ['SubnetConfig', 'VpcCidrBlock', 'CIDR']
+        EnableIPV6Cidr: !Ref EnableIPV6Cidr
+      TimeoutInMinutes: 15
+  ###################################### VPC Default security group ################################
+  DefaultVPCSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Sub "${ProjectName}-sg"
+      GroupDescription: Default Security Group for the VPC
+      VpcId: !GetAtt VPC.Outputs.VpcId
+      Tags:
+      - Key: Name
+        Value: !Sub '${ProjectName}-sg-${Environment}-${AWS::Region}${CiBuild}'
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: GitHubRepository
+        Value: !Ref GitHubRepository
+      - Key: GitHubRef
+        Value: !Ref GitHubRef
+      - Key: GitHubURL
+        Value: !Ref GitHubURL
+      - Key: GitHubWFRunNumber
+        Value: !Ref GitHubWFRunNumber
+      - Key: GitHubSHA
+        Value: !Ref GitHubSHA
+  DefaultVPCSecurityGroupSelfRefIngress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      SourceSecurityGroupId: !Ref DefaultVPCSecurityGroup
+      IpProtocol: '-1'
+      GroupId: !Ref DefaultVPCSecurityGroup
+  ###################################### Network Acl ###############################################
+  CustomNACL:
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${CodeRepositoryS3Bucket}.s3.amazonaws.com/${GitHubRepository}/${GitHubSHA}/cft/nested-stacks/nacl-stack.yaml'
+      Parameters:  
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        GitHubRepository: !Ref GitHubRepository
+        GitHubRef: !Ref GitHubRef
+        GitHubURL: !Ref GitHubURL
+        GitHubWFRunNumber: !Ref GitHubWFRunNumber
+        GitHubSHA: !Ref GitHubSHA
+        CiBuild: !Ref CiBuild
+        VpcId: !GetAtt VPC.Outputs.VpcId
+      TimeoutInMinutes: 15
+  ###################################### Subnets ###################################################
+  #*************************************************************************************************
+  ###################################### Private Subnet AZ1 #########################################
+  PrivateSubnetAZ1:
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${CodeRepositoryS3Bucket}.s3.amazonaws.com/${GitHubRepository}/${GitHubSHA}/cft/nested-stacks/subnet-stack.yaml'
+      Parameters:  
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        GitHubRepository: !Ref GitHubRepository
+        GitHubRef: !Ref GitHubRef
+        GitHubURL: !Ref GitHubURL
+        GitHubWFRunNumber: !Ref GitHubWFRunNumber
+        GitHubSHA: !Ref GitHubSHA
+        CiBuild: !Ref CiBuild
+        SubnetName: !Sub '${ProjectName}-pvt-subnet-az1${CiBuild}'
+        VPCId: !GetAtt VPC.Outputs.VpcId
+        CidrBlock: !FindInMap ['SubnetConfig', 'PrivateSubnetAZ1CidrBlock', 'CIDR']
+        AvailabilityZone: 
+          Fn::Select: 
+            - '0'
+            - Fn::GetAZs: !Ref 'AWS::Region'
+        EnableIPV6Cidr: !Ref EnableIPV6Cidr
+        IPv6CidrBlock:  
+          Fn::Sub:
+          - "${VpcPart}${SubnetPart}"
+          - SubnetPart: '00::/64'
+            VpcPart: !Select [ 0, !Split [ '00::/56', !GetAtt VPC.Outputs.VpcIpv6CidrBlocks ]]
+        NetworkAclId: !GetAtt CustomNACL.Outputs.NaclId
+      TimeoutInMinutes: 15
+  ###################################### Private Subnet AZ2 ########################################
+  PrivateSubnetAZ2:
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${CodeRepositoryS3Bucket}.s3.amazonaws.com/${GitHubRepository}/${GitHubSHA}/cft/nested-stacks/subnet-stack.yaml'
+      Parameters:  
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        GitHubRepository: !Ref GitHubRepository
+        GitHubRef: !Ref GitHubRef
+        GitHubURL: !Ref GitHubURL
+        GitHubWFRunNumber: !Ref GitHubWFRunNumber
+        GitHubSHA: !Ref GitHubSHA
+        CiBuild: !Ref CiBuild
+        SubnetName: !Sub '${ProjectName}-pvt-subnet-az2${CiBuild}'
+        VPCId: !GetAtt VPC.Outputs.VpcId
+        CidrBlock: !FindInMap ['SubnetConfig', 'PrivateSubnetAZ2CidrBlock', 'CIDR']
+        AvailabilityZone: 
+          Fn::Select: 
+          - '1'
+          - Fn::GetAZs: !Ref 'AWS::Region'
+        EnableIPV6Cidr: !Ref EnableIPV6Cidr
+        IPv6CidrBlock:  
+          Fn::Sub:
+          - "${VpcPart}${SubnetPart}"
+          - SubnetPart: '04::/64'
+            VpcPart: !Select [ 0, !Split [ '00::/56', !GetAtt VPC.Outputs.VpcIpv6CidrBlocks ]]
+        NetworkAclId: !GetAtt CustomNACL.Outputs.NaclId
+      TimeoutInMinutes: 15
+  ###################################### Private Route Table #######################################
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !GetAtt VPC.Outputs.VpcId
+      Tags: 
+      - Key: Name
+        Value: !Sub '${ProjectName}-pvt-rt-${Environment}-${AWS::Region}${CiBuild}'
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: GitHubRepository
+        Value: !Ref GitHubRepository
+      - Key: GitHubRef
+        Value: !Ref GitHubRef
+      - Key: GitHubURL
+        Value: !Ref GitHubURL
+      - Key: GitHubWFRunNumber
+        Value: !Ref GitHubWFRunNumber
+      - Key: GitHubSHA
+        Value: !Ref GitHubSHA
+  PrivateSubnetAZ1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !GetAtt PrivateSubnetAZ1.Outputs.SubnetId
+      RouteTableId: !Ref PrivateRouteTable
+  PrivateSubnetAZ2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !GetAtt PrivateSubnetAZ2.Outputs.SubnetId
+      RouteTableId: !Ref PrivateRouteTable
+  ###################################### S3 VPC Endpoint ###########################################
+  S3VPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal: '*'
+          Action: '*'
+          Resource: '*'
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      RouteTableIds:
+      - !Ref PrivateRouteTable
+      VpcEndpointType: Gateway
+      VpcId: !GetAtt VPC.Outputs.VpcId
+  ###################################### KMS VPC Endpoint ##########################################
+  KMSVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.kms
+      SubnetIds: 
+      - !GetAtt  PrivateSubnetAZ1.Outputs.SubnetId
+      - !GetAtt  PrivateSubnetAZ2.Outputs.SubnetId
+      VpcId: !GetAtt VPC.Outputs.VpcId
+      VpcEndpointType: Interface
+      SecurityGroupIds:
+      - !Ref DefaultVPCSecurityGroup
+      PrivateDnsEnabled: true
+  ###################################### Glue VPC Endpoint ##########################################
+  GlueVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.glue"
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action:
+            - 's3:GetObject'
+            Resource:
+            - !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-${S3LandingZoneBucketBaseName}-${Environment}-${AWS::Region}${CiBuild}/*'
+      SubnetIds: 
+      - !GetAtt  PrivateSubnetAZ1.Outputs.SubnetId
+      - !GetAtt  PrivateSubnetAZ2.Outputs.SubnetId
+      VpcId: !GetAtt VPC.Outputs.VpcId
+      VpcEndpointType: Interface
+      SecurityGroupIds:
+      - !Ref DefaultVPCSecurityGroup
+      PrivateDnsEnabled: true
+Outputs:
+  ###################################### VPC #######################################################
+  VpcId:
+    Description: Vpc Id
+    Value: !GetAtt VPC.Outputs.VpcId
+  VpcCidrBlock:
+    Description: VPC CI/DR Block
+    Value: !GetAtt VPC.Outputs.VpcCidrBlock
+  VpcCidrBlockAssociations:
+    Description: VPC CI/DR Block Associations
+    Value: !GetAtt VPC.Outputs.VpcCidrBlockAssociations ##!Select [ 0, !GetAtt VPC.Outputs.CidrBlockAssociations ]
+  VpcDefaultNetworkAcl:
+    Description: VPC Default ACL
+    Value: !GetAtt VPC.Outputs.VpcDefaultNetworkAcl
+  VpcDefaultSecurityGroup:
+    Description: VPC Default Security Group
+    Value: !GetAtt VPC.Outputs.VpcDefaultSecurityGroup
+  VpcIpv6CidrBlocks:
+    Condition: EnableIPV6Cidr
+    Description: IPV6 CI/DR Blocks
+    Value: !GetAtt VPC.Outputs.VpcIpv6CidrBlocks
+  ###################################### NACL ######################################################
+  NetworkAclId:
+    Description: Network Acl Id
+    Value: !GetAtt CustomNACL.Outputs.NaclId
+  ###################################### Subnets ###################################################
+  ###################################### Private Subnet - AZ1 ######################################
+  PrivateSubnetAZ1Id:
+    Description: Private Subnet-AZ1 Id
+    Value: !GetAtt  PrivateSubnetAZ1.Outputs.SubnetId
+  PrivateSubnetAZ1AvailabilityZone:
+    Description: Private Subnet-AZ1 Availability Zone
+    Value: !GetAtt PrivateSubnetAZ1.Outputs.SubnetAvailabilityZone
+  PrivateSubnetAZ1AvailabilityZoneId:
+    Description: Private Subnet-AZ1 Availability ZoneId
+    Value: !GetAtt PrivateSubnetAZ1.Outputs.SubnetAvailabilityZoneId
+  PrivateSubnetAZ1CidrBlock:
+    Description: Private Subnet-AZ1 CI/DR Block
+    Value: !GetAtt PrivateSubnetAZ1.Outputs.SubnetCidrBlock
+  PrivateSubnetAZ1NetworkAclAssociationId:
+    Description: Private Subnet-AZ1 Network Acl Association Id
+    Value: !GetAtt PrivateSubnetAZ1.Outputs.SubnetNetworkAclAssociationId
+  ###################################### Private Subnet - AZ2 ######################################
+  PrivateSubnetAZ2Id:
+    Description: Private Subnet-AZ2 Id
+    Value: !GetAtt  PrivateSubnetAZ2.Outputs.SubnetId
+  PrivateSubnetAZ2AvailabilityZone:
+    Description: Private Subnet-AZ2 Availability Zone
+    Value: !GetAtt PrivateSubnetAZ2.Outputs.SubnetAvailabilityZone
+  PrivateSubnetAZ2AvailabilityZoneId:
+    Description: Private Subnet-AZ2 Availability ZoneId
+    Value: !GetAtt PrivateSubnetAZ2.Outputs.SubnetAvailabilityZoneId
+  PrivateSubnetAZ2CidrBlock:
+    Description: Private Subnet-AZ2 CI/DR Block
+    Value: !GetAtt PrivateSubnetAZ2.Outputs.SubnetCidrBlock
+  PrivateSubnetAZ2NetworkAclAssociationId:
+    Description: Private Subnet-AZ2 Network Acl Association Id
+    Value: !GetAtt PrivateSubnetAZ2.Outputs.SubnetNetworkAclAssociationId
+  ###################################### Private Route Table #######################################
+  PrivateRouteTableId: 
+    Description: Private Route Table Id
+    Value: !GetAtt PrivateRouteTable.RouteTableId
+  PrivateSubnetAZ1RouteTableAssociationId:
+    Description: Private Subnet-AZ1 Route Table Association Id
+    Value: !Ref PrivateSubnetAZ1RouteTableAssociation
+  PrivateSubnetAZ2RouteTableAssociationId:
+    Description: Private Subnet-AZ2 Route Table Association Id
+    Value: !Ref PrivateSubnetAZ2RouteTableAssociation
+  ###################################### S3 VPC Gateway Endpoint ###################################
+  S3VpcEndpointId:
+    Description: S3 VPC Gateway Endpoint Id
+    Value: !GetAtt S3VPCEndpoint.Id
+  ###################################### KMS VPC Interface Endpoint ################################
+  KMSVPCEndpointId:
+    Description: KMS VPC Interface Endpoint Id
+    Value: !GetAtt KMSVPCEndpoint.Id
+  ###################################### Glue VPC Interface Endpoint ###############################
+  GlueVPCEndpointId:
+    Description: Glue VPC Interface Endpoint Id
+    Value: !GetAtt GlueVpcEndpoint.Id
+
+
+  
